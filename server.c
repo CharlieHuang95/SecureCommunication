@@ -9,8 +9,6 @@
 #include <arpa/inet.h>
 #include <openssl/ssl.h>
 
-#include "common.h"
-
 #define PORT 8765
 
 /* use these strings to tell the marker what is happening */
@@ -53,7 +51,7 @@ int main(int argc, char **argv)
     close(sock);
     exit(0);
   }
-  context = initialize_ctx(SERVER_KEYFILE, SERVER_PASSWORD);
+  context = initialize_ctx(SERVER_KEYFILE, SERVER_PASSWORD, CA_LIST);
   
   memset(&sin,0,sizeof(sin));
   sin.sin_addr.s_addr=INADDR_ANY;

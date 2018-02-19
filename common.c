@@ -1,4 +1,3 @@
-#include "common.h"
 #include <openssl/ssl.h>
 
 bio_err = 0;
@@ -17,7 +16,7 @@ int berr_exit(char* string) {
 }
 
 // Taken from Tutorial
-SSL_CTX *initialize_ctx(char* keyfile, char* password) {
+SSL_CTX* initialize_ctx(char* keyfile, char* password, char* ca_list) {
     SSL_METHOD *meth;
     SSL_CTX *ctx;
     if(!bio_err){
@@ -43,7 +42,7 @@ SSL_CTX *initialize_ctx(char* keyfile, char* password) {
         keyfile,SSL_FILETYPE_PEM)))
         berr_exit("Can't read key file");
     /* Load the CAs we trust*/
-    if(!(SSL_CTX_load_verify_locations(ctx, CA_LIST,0)))
+    if(!(SSL_CTX_load_verify_locations(ctx, ca_list, 0)))
         berr_exit("Can't read CA list");
 #if (OPENSSL_VERSION_NUMBER < 0x0090600fL)
     SSL_CTX_set_verify_depth(ctx, 1);
