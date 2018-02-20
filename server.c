@@ -18,14 +18,23 @@
 #define FMT_INCOMPLETE_CLOSE "ECE568-SERVER: Incomplete shutdown\n"
 
 #define SERVER_KEYFILE "bob.pem"
-#define SERVER_PASSWORD "passwoerd"
+#define SERVER_PASSWORD "password"
 #define CA_LIST "568ca.pem"
+
+#define DEBUG 1
+
+int berr_exit(char* string);
+SSL_CTX *initialize_ctx (char *keyfile, char *cafile, char *password);
+
 
 int main(int argc, char **argv)
 {
   int s, sock, port=PORT;
   struct sockaddr_in sin;
   int val=1;
+  
+  SSL* ssl;
+  BIO* sbio;
   pid_t pid;
   SSL_CTX* context;
   
@@ -52,7 +61,14 @@ int main(int argc, char **argv)
     exit(0);
   }
   context = initialize_ctx(SERVER_KEYFILE, SERVER_PASSWORD, CA_LIST);
-  
+  if (DEBUG) {printf("Initialized context\n"); fflush(stdout);}
+
+  // Only communicate with SSLv3 or TLSv1
+  SSL_CTX_set_cipher_list(context, "SSLv3:TLSv1");
+  if (DEBUG) {printf("Set cipher list\n"); fflush(stdout);}
+  SSL_CTX_set_verify(context,SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT, 0);
+  if (DEBUG) {printf("Set verify\n"); fflush(stdout);}
+
   memset(&sin,0,sizeof(sin));
   sin.sin_addr.s_addr=INADDR_ANY;
   sin.sin_family=AF_INET;
@@ -87,6 +103,11 @@ int main(int argc, char **argv)
       close(s);
     }
     else {
+      sbio = BIO_new_socket(s, BIO_NOCLOSE);
+      ssl =  SSL_new(context);
+      SSL_set_bio(ssl, sbio, sbio);
+      if ((SSL_accept(ssl) <= 0))
+        berr_exit("SSL accept error");
       /*Child code*/
       int len;
       char buf[256];
