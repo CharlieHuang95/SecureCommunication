@@ -22,7 +22,7 @@
 #define SERVER_PASSWORD "password"
 #define CA_LIST "568ca.pem"
 
-#define DEBUG 1
+#define DEBUG 0
 
 int berr_exit(char* string);
 SSL_CTX *initialize_ctx (char *keyfile, char *cafile, char *password);

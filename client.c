@@ -25,7 +25,7 @@
 #define CLIENT_PASSWORD "passwored"
 #define CA_LIST "568ca.pem"
 
-#define DEBUG 1
+#define DEBUG 0
 
 int berr_exit(char* string);
 SSL_CTX *initialize_ctx (char *keyfile, char *cafile, char *password);
@@ -34,9 +34,10 @@ int check_cert(SSL* ssl) {
     X509 *peer;
     char peer_CN[256];
     char peer_email[256];
+    char ca_issuer[256];
 
     if(SSL_get_verify_result(ssl)!=X509_V_OK)
-      berr_exit("Certificate doesn't verify");
+        berr_exit(FMT_NO_VERIFY);
     /*Check the cert chain. The chain length
       is automatically checked by OpenSSL when
       we set the verify depth in the ctx */
@@ -45,20 +46,24 @@ int check_cert(SSL* ssl) {
     X509_NAME_get_text_by_NID(X509_get_subject_name(peer),
                               NID_commonName, peer_CN, 256);
     if (strcasecmp(peer_CN, "Bob's Server"))
-        berr_exit("Common name doesn't match expected 'Bob's Server'");
+        berr_exit(FMT_CN_MISMATCH);
     X509_NAME_get_text_by_NID(X509_get_subject_name(peer),
                               NID_pkcs9_emailAddress, peer_email, 256);
     if (strcasecmp(peer_email, "ece568bob@ecf.utoronto.ca"))
-        berr_exit("Email doesn't match expected 'ece568bob@ecf.utoronto.ca'");
+        berr_exit(FMT_EMAIL_MISMATCH);
+    // Everything is correct. Get the CA issuer
+    X509_NAME_get_text_by_NID(X509_get_issuer_name(peer),
+                              NID_commonName, ca_issuer, 256);
+    printf(FMT_SERVER_INFO, peer_CN, peer_email, ca_issuer);
     return 0;
 }
 
-void send_req_to_server(SSL* ssl, char* REQUEST_TEMPLATE) {
+void send_req_to_server(SSL* ssl, char* request_input) {
   char* request;
-  int request_len = strlen(REQUEST_TEMPLATE) + strlen(HOST) + 6;
+  int request_len = strlen(request_input) + strlen(HOST) + 6;
   if (!(request=(char *)malloc(request_len)))
     berr_exit("Couldn't allocate request");
-  sprintf(request, REQUEST_TEMPLATE, HOST, PORT);
+  sprintf(request, request_input, HOST, PORT);
   /* Find the exact request_len */
   request_len = strlen(request);
   int r = SSL_write(ssl, request, request_len);
@@ -159,7 +164,7 @@ int main(int argc, char **argv)
   if (DEBUG) {printf("Opened SSL Socket\n"); fflush(stdout);}
 
   if (SSL_connect(ssl) <= 0)
-    berr_exit("SSL connect error");
+    berr_exit(FMT_CONNECT_ERR);
 
   // Check server's certificate 
   if (!check_cert(ssl)) {

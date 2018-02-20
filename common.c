@@ -1,6 +1,6 @@
 #include <openssl/ssl.h>
 
-#define DEBUG 1
+#define DEBUG 0
 
 BIO* bio_err = 0;
 
