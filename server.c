@@ -9,6 +9,7 @@
 #include <arpa/inet.h>
 #include <openssl/ssl.h>
 
+#define HOST "localhost"
 #define PORT 8765
 
 /* use these strings to tell the marker what is happening */
@@ -26,6 +27,39 @@
 int berr_exit(char* string);
 SSL_CTX *initialize_ctx (char *keyfile, char *cafile, char *password);
 
+void http_serve(SSL* ssl, int s, char* answer) {
+    char request[256];
+    
+    // Check the certificate maybe?
+    int r = SSL_read(ssl, request, 256);
+    switch (SSL_get_error(ssl, r)) {
+        case SSL_ERROR_NONE:
+            break;
+        default:
+            berr_exit("Incorrect processing of request\n");
+    }
+    request[r] = '\0';
+    printf(FMT_OUTPUT, request, answer);
+    
+    char response_buf[256];
+    sprintf(response_buf, answer);
+    char* response;
+    int response_len = strlen(response_buf) + strlen(HOST) + 6;
+    if (!(response=(char *)malloc(response_len)))
+        berr_exit("Couldn't allocate request");
+    sprintf(response, response_buf);
+    /* Find the exact request_len */
+    response_len = strlen(response);
+    r = SSL_write(ssl, response, response_len);
+    switch (SSL_get_error(ssl, r)){
+        case SSL_ERROR_NONE:
+            if (response_len!=r)
+                berr_exit("Incomplete write!");
+            break;
+        default:
+            berr_exit("SSL write problem");
+  }
+}
 
 int main(int argc, char **argv)
 {
@@ -112,11 +146,11 @@ int main(int argc, char **argv)
       int len;
       char buf[256];
       char *answer = "42";
-
-      len = recv(s, &buf, 255, 0);
-      buf[len]= '\0';
-      printf(FMT_OUTPUT, buf, answer);
-      send(s, answer, strlen(answer), 0);
+      http_serve(ssl, s, answer);
+      //len = recv(s, &buf, 255, 0);
+      //buf[len]= '\0';
+      //printf(FMT_OUTPUT, buf, answer);
+      //send(s, answer, strlen(answer), 0);
       close(sock);
       close(s);
       return 0;

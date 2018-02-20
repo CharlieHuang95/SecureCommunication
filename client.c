@@ -53,8 +53,38 @@ int check_cert(SSL* ssl) {
     return 0;
 }
 
-void send_req_to_server(SSL* ssl, char* msg) {
-    return;
+void send_req_to_server(SSL* ssl, char* REQUEST_TEMPLATE) {
+  char* request;
+  int request_len = strlen(REQUEST_TEMPLATE) + strlen(HOST) + 6;
+  if (!(request=(char *)malloc(request_len)))
+    berr_exit("Couldn't allocate request");
+  sprintf(request, REQUEST_TEMPLATE, HOST, PORT);
+  /* Find the exact request_len */
+  request_len = strlen(request);
+  int r = SSL_write(ssl, request, request_len);
+  switch (SSL_get_error(ssl, r)){
+    case SSL_ERROR_NONE:
+      if (request_len!=r)
+        berr_exit("Incomplete write!");
+      break;
+    default:
+      berr_exit("SSL write problem");
+  }
+}
+
+void receive_req_from_server(SSL* ssl) {
+    char response[256];
+
+    // Check the certificate maybe?
+    int r = SSL_read(ssl, response, 256);
+    switch (SSL_get_error(ssl, r)) {
+        case SSL_ERROR_NONE:
+            break;
+        default:
+            berr_exit("Incorrect processing of request\n");
+    }
+    response[r] = '\0';
+    printf(FMT_OUTPUT, "What's the question?", response);
 }
 
 int main(int argc, char **argv)
@@ -134,15 +164,16 @@ int main(int argc, char **argv)
   // Check server's certificate 
   if (!check_cert(ssl)) {
     send_req_to_server(ssl, secret);
+    receive_req_from_server(ssl);
   }
 
   // TODO(charlie): remove after enabling SSL channel
-  send(sock, secret, strlen(secret),0);
-  len = recv(sock, &buf, 255, 0);
-  buf[len]='\0';
+  //send(sock, secret, strlen(secret),0);
+  //len = recv(sock, &buf, 255, 0);
+  //buf[len]='\0';
   
   // this is how you output something for the marker to pick up 
-  printf(FMT_OUTPUT, secret, buf);
+  //printf(FMT_OUTPUT, secret, buf);
   
   close(sock);
   return 1;
