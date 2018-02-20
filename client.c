@@ -8,6 +8,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <openssl/ssl.h>
+#include <string.h>
 
 #define HOST "localhost"
 #define PORT 8765
@@ -92,14 +93,13 @@ void receive_req_from_server(SSL* ssl) {
     printf(FMT_OUTPUT, "What's the question?", response);
 }
 
-int main(int argc, char **argv)
-{
-  int len, sock, port=PORT;
+int main(int argc, char **argv) {
+  int sock, port=PORT;
   char *host=HOST;
   struct sockaddr_in addr;
   struct hostent *host_entry;
-  char buf[256];
   char *secret = "What's the question?";
+
   SSL_CTX* context;
   BIO* sbio;
   SSL* ssl;

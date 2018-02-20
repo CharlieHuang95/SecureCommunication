@@ -8,6 +8,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <openssl/ssl.h>
+#include <string.h>
 
 #define HOST "localhost"
 #define PORT 8765
@@ -26,6 +27,30 @@
 
 int berr_exit(char* string);
 SSL_CTX *initialize_ctx (char *keyfile, char *cafile, char *password);
+
+int check_cert(SSL* ssl) {
+    X509 *peer;
+    char peer_CN[256];
+    char peer_email[256];
+
+    if(SSL_get_verify_result(ssl)!=X509_V_OK) {
+        printf(FMT_ACCEPT_ERR);
+        ERR_print_errors();
+        berr_exit("");
+    }
+    peer=SSL_get_peer_certificate(ssl);
+    X509_NAME_get_text_by_NID(X509_get_subject_name(peer),
+                              NID_commonName, peer_CN, 256);
+    X509_NAME_get_text_by_NID(X509_get_subject_name(peer),
+                              NID_pkcs9_emailAddress, peer_email, 256);
+
+    /*Check the cert chain. The chain length
+      is automatically checked by OpenSSL when
+      we set the verify depth in the ctx */
+    /*Check the common name*/
+    printf(FMT_CLIENT_INFO, peer_CN, peer_email);
+    return 0;
+}
 
 void http_serve(SSL* ssl, int s, char* answer) {
     char request[256];
@@ -98,7 +123,7 @@ int main(int argc, char **argv)
   if (DEBUG) {printf("Initialized context\n"); fflush(stdout);}
 
   // Only communicate with SSLv3 or TLSv1
-  SSL_CTX_set_cipher_list(context, "SSLv3:TLSv1");
+  SSL_CTX_set_cipher_list(context, "SSLv2:SSLv3:TLSv1");
   if (DEBUG) {printf("Set cipher list\n"); fflush(stdout);}
   SSL_CTX_set_verify(context,SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT, 0);
   if (DEBUG) {printf("Set verify\n"); fflush(stdout);}
@@ -135,22 +160,16 @@ int main(int argc, char **argv)
     
     if((pid=fork())){
       close(s);
-    }
-    else {
+    } else {
       sbio = BIO_new_socket(s, BIO_NOCLOSE);
       ssl =  SSL_new(context);
       SSL_set_bio(ssl, sbio, sbio);
       if ((SSL_accept(ssl) <= 0))
-        berr_exit("SSL accept error");
+        berr_exit(FMT_ACCEPT_ERR);
       /*Child code*/
-      int len;
-      char buf[256];
+      check_cert(ssl);
       char *answer = "42";
       http_serve(ssl, s, answer);
-      //len = recv(s, &buf, 255, 0);
-      //buf[len]= '\0';
-      //printf(FMT_OUTPUT, buf, answer);
-      //send(s, answer, strlen(answer), 0);
       close(sock);
       close(s);
       return 0;
