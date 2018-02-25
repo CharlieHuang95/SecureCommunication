@@ -1,0 +1,9 @@
+#Haoen Huang, 1000738570, haoen.huang@mail.utoronto.ca
+#Xiuyan Yu, 1000756719, xiuyan.yu@mail.utoronto.ca
+
+
+On the client side, an SSL context object is initialised with the key and certificate authority certificate. The context is used to create secure SSL connections. An SSL socket is opened over a TCP socket. First the client performs a handshake using SSL_connect, and then it checks the correctness of the server's Common Name, email address and CA signature. If those are not confirmed, the client exits with a relevant message. If they are, the client can now perform write and reads.
+
+Similarly on the server side, first an SSL context is created. The server forks a new process for each client, checks their certificate, and if it confirms that it is a valid certificate signed by the CA it serves their HTTP request.
+
+Once the request is completed, the connection must be shutdown by using SSL_shutdown. To confirm that shutdown is performed correctly, the side initiating shutdown needs to send a shutdown message (a close_notify), which immediately returns, so they must then send shutdown again to wait for the response that indicates the other side has received it and is ready for shutdown too. If on either side the shutdown process isn't performed correctly, it will report with a stdout message.
