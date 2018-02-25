@@ -70,27 +70,53 @@ void send_req_to_server(SSL* ssl, char* request_input) {
   int r = SSL_write(ssl, request, request_len);
   switch (SSL_get_error(ssl, r)){
     case SSL_ERROR_NONE:
-      if (request_len!=r)
-        berr_exit("Incomplete write!");
-      break;
+        if (request_len!=r)
+            berr_exit("Incomplete write!");
+        break;
+    case SSL_ERROR_SYSCALL:
+        berr_exit(FMT_INCORRECT_CLOSE);
+        return 0;
     default:
-      berr_exit("SSL write problem");
+        berr_exit("SSL write problem");
   }
 }
 
 void receive_req_from_server(SSL* ssl) {
     char response[256];
 
-    // Check the certificate maybe?
-    int r = SSL_read(ssl, response, 256);
-    switch (SSL_get_error(ssl, r)) {
-        case SSL_ERROR_NONE:
-            break;
-        default:
-            berr_exit("Incorrect processing of request\n");
+    while(1) {
+        // Check the certificate maybe?
+        int r = SSL_read(ssl, response, 256);
+        switch (SSL_get_error(ssl, r)) {
+            case SSL_ERROR_NONE:
+                response[r] = '\0';
+                printf(FMT_OUTPUT, "What's the question?", response);
+                break;
+            case SSL_ERROR_ZERO_RETURN:
+                goto  shutdown;
+            case SSL_ERROR_SYSCALL:
+                berr_exit(FMT_INCORRECT_CLOSE);
+                goto done;
+            default:
+                berr_exit("Incorrect processing of request\n");
+        }
+        
+        shutdown:
+            if (DEBUG) printf("Shutting down...\n");
+            r = SSL_shutdown(ssl);
+            switch(r) {
+                case 1:
+                    break; /* Success */
+                case 0:
+                case -1:
+                default:
+                    berr_exit(FMT_INCORRECT_CLOSE);
+            }
+        
+        done:
+            SSL_free(ssl);
+            return(0);
     }
-    response[r] = '\0';
-    printf(FMT_OUTPUT, "What's the question?", response);
 }
 
 int main(int argc, char **argv) {
@@ -179,7 +205,7 @@ int main(int argc, char **argv) {
   
   // this is how you output something for the marker to pick up 
   //printf(FMT_OUTPUT, secret, buf);
-  
+
   close(sock);
   return 1;
 }
