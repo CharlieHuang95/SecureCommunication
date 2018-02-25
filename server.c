@@ -60,6 +60,11 @@ void http_serve(SSL* ssl, int s, char* answer) {
     switch (SSL_get_error(ssl, r)) {
         case SSL_ERROR_NONE:
             break;
+        case SSL_ERROR_ZERO_RETURN:
+            goto shutdown;
+        case SSL_ERROR_SYSCALL:
+            berr_exit(FMT_INCOMPLETE_CLOSE);
+            goto done;
         default:
             berr_exit("Incorrect processing of request\n");
     }
@@ -75,15 +80,45 @@ void http_serve(SSL* ssl, int s, char* answer) {
     sprintf(response, response_buf);
     /* Find the exact request_len */
     response_len = strlen(response);
+    
+    
     r = SSL_write(ssl, response, response_len);
     switch (SSL_get_error(ssl, r)){
         case SSL_ERROR_NONE:
             if (response_len!=r)
                 berr_exit("Incomplete write!");
             break;
+        case SSL_ERROR_ZERO_RETURN:
+            goto shutdown;
+        case SSL_ERROR_SYSCALL:
+            berr_exit(FMT_INCOMPLETE_CLOSE);
+            goto done;
         default:
             berr_exit("SSL write problem");
-  }
+    }
+    
+    shutdown:
+        r=SSL_shutdown(ssl);
+        if(!r){
+          /* If we called SSL_shutdown() first then
+             we always get return value of '0'. In
+             this case, try again, but first send a
+             TCP FIN to trigger the other side's
+             close_notify*/
+            shutdown(s,1);
+            r=SSL_shutdown(ssl);
+        }
+        switch(r){
+          case 1:
+            break; /* Success */
+          case 0:
+          case -1:
+          default:
+            berr_exit(FMT_INCOMPLETE_CLOSE);
+        }
+    done:
+        SSL_free(ssl);
+        return 0;
 }
 
 int main(int argc, char **argv)
