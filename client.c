@@ -23,7 +23,7 @@
 #define FMT_INCORRECT_CLOSE "ECE568-CLIENT: Premature close\n"
 
 #define CLIENT_KEYFILE "alice.pem"
-#define CLIENT_PASSWORD "passwored"
+#define CLIENT_PASSWORD "password"
 #define CA_LIST "568ca.pem"
 
 #define DEBUG 0
@@ -59,8 +59,11 @@ int check_cert(SSL* ssl) {
     return 0;
 }
 
-void send_req_to_server(SSL* ssl, char* request_input) {
+void communicate_with_server(SSL* ssl, char* request_input) {
   char* request;
+  char response[256];
+  
+  /* Send request to server */
   int request_len = strlen(request_input) + strlen(HOST) + 6;
   if (!(request=(char *)malloc(request_len)))
     berr_exit("Couldn't allocate request");
@@ -73,17 +76,19 @@ void send_req_to_server(SSL* ssl, char* request_input) {
         if (request_len!=r)
             berr_exit("Incomplete write!");
         break;
+    case SSL_ERROR_ZERO_RETURN:
+        if (DEBUG) printf("send req to server: going to shutdown\n");
+        goto shutdown;
     case SSL_ERROR_SYSCALL:
+        if (DEBUG) printf("send req to server: calling berr exit\n");
         berr_exit(FMT_INCORRECT_CLOSE);
-        return 0;
+        goto done;
     default:
         berr_exit("SSL write problem");
   }
-}
 
-void receive_req_from_server(SSL* ssl) {
-    char response[256];
-
+    
+    /* Receive request from server */
     while(1) {
         // Check the certificate maybe?
         int r = SSL_read(ssl, response, 256);
@@ -93,30 +98,34 @@ void receive_req_from_server(SSL* ssl) {
                 printf(FMT_OUTPUT, "What's the question?", response);
                 break;
             case SSL_ERROR_ZERO_RETURN:
-                goto  shutdown;
+                if (DEBUG) printf("receive req from server: going to shutdown\n");
+                goto shutdown;
             case SSL_ERROR_SYSCALL:
+                if (DEBUG) printf("receive req from server: calling berr exit\n");
                 berr_exit(FMT_INCORRECT_CLOSE);
                 goto done;
             default:
                 berr_exit("Incorrect processing of request\n");
         }
+    }
         
         shutdown:
             if (DEBUG) printf("Shutting down...\n");
             r = SSL_shutdown(ssl);
             switch(r) {
                 case 1:
+                    if (DEBUG) printf("shutdown: success\n");
                     break; /* Success */
                 case 0:
                 case -1:
                 default:
+                    if (DEBUG) printf("shutdown: calling berr exit\n");
                     berr_exit(FMT_INCORRECT_CLOSE);
             }
         
         done:
             SSL_free(ssl);
-            return(0);
-    }
+            return 0;
 }
 
 int main(int argc, char **argv) {
@@ -194,8 +203,7 @@ int main(int argc, char **argv) {
 
   // Check server's certificate 
   if (!check_cert(ssl)) {
-    send_req_to_server(ssl, secret);
-    receive_req_from_server(ssl);
+    communicate_with_server(ssl, secret);
   }
 
   // TODO(charlie): remove after enabling SSL channel

@@ -110,6 +110,7 @@ void http_serve(SSL* ssl, int s, char* answer) {
         }
         switch(r){
           case 1:
+            if (DEBUG) printf("successful shut down\n");
             break; /* Success */
           case 0:
           case -1:
