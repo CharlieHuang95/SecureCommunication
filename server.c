@@ -35,7 +35,7 @@ int check_cert(SSL* ssl) {
 
     if(SSL_get_verify_result(ssl)!=X509_V_OK) {
         printf(FMT_ACCEPT_ERR);
-        ERR_print_errors();
+        ERR_print_errors_fp(stdout);
         berr_exit("");
     }
     peer=SSL_get_peer_certificate(ssl);
@@ -119,7 +119,7 @@ void http_serve(SSL* ssl, int s, char* answer) {
         }
     done:
         SSL_free(ssl);
-        return 0;
+        return;
 }
 
 int main(int argc, char **argv)
